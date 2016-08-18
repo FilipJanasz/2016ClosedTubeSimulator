@@ -1,0 +1,46 @@
+Variable names explanation:
+
+htrnr - heat flux [W/m2]
+htvat - heat structure temperature [K]
+p - pressure [Pa], normalized against pressure at inlet
+sattemp - saturation temperature [K]
+tempf - temperature of fluid [K], normalized against temperature at inlet
+tempg - temperature of has [K], normalized against temperature at inlet
+vapgen - vapour generation rate [kg/(m3*s)]
+velf - average velocity of liquid volume [m/s]
+velg - average velocity of vapor volume [m/s]
+
+velf seems to be an unstable parameter, varying widely from timestep to timestep
+
+
+
+*------------------------------------------------------------------
+Explanation of file-naming scheme:
+
+example - 50_50_15_0_0_80_2000 translates to:
+
+first five parameters describe primary side
+50 Bar, 50 K superheat over boiling temperature related to 50 Bar, 15 kg/h mass flow, 0% of He in the non condensable mixture (relation of He to N2),  0 kg/h of NC mixture in the flow
+
+last two describe secondary flow:
+80 K subcoolling under boiling temperature in primary side, 2000 kg/h mass flow
+
+
+*-------------------------------------------------------------------
+taken from progarmmers_manual_relap5_33.pdf
+
+floreg
+1 high mixing bubbly
+2 high mixing bubbly/mist transition
+3 high mixing mist
+4 bubbly
+5 slug
+6 annular-mist
+7 mist pre_CHF
+8 inverted annular
+9 inverted slug
+10 mist
+11 mpo mist-post-chf
+12 hst horizontal stratified
+13 vst vertical stratified
+ 
