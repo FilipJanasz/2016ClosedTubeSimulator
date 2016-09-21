@@ -11,7 +11,10 @@ cd(default_dir)
 checkLog;
 
 %set license as enviromental variable
-license='018401502097157222077118';
+%set license as enviromental variable
+lic_file=fopen([dirCode,'\license.txt']);
+license=textscan(lic_file,'%s');
+fclose(lic_file);
 setenv('rslicense',license);
 %REMEMBER ABOUT SETTING UP ENV VAR FOR RS LICENSE!!!!!
 

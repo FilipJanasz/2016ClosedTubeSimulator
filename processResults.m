@@ -1,4 +1,4 @@
-clc, clear all, close all
+% clc, clear all, close all
 
 endtime='40000.';
 mindt='1.e-10';

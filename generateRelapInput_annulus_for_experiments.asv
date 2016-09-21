@@ -121,6 +121,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
             radius_heater_inner=num2str(heater_diam_inner/2);
             radius_heater_outer=num2str(heater_diam_outer/2);
             Heatflux=Power/heater_area;
+            Power=num2str(Power);
 
         %change pressure from bar to Pa
             Pps=Pps*1e5;
@@ -204,6 +205,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
             disp('Nodalization succesful - good job!')
 
     %% LOOPS
+
     %Generation loop (single, for experimental data comparisons)
     for inputDecks_counter=1:inputDecks_amount;
         
@@ -212,33 +214,30 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         curr_Superheat=Superheat(inputDecks_counter);
         curr_Pss=Pss(inputDecks_counter);
         curr_Heatflux=Heatflux(inputDecks_counter);
-        curr_Helium=Helium(inputDecks_counter);
-        curr_Mflowss=Mflowss(inputDecks_counter);
-        curr_Power=Power(inputDecks_counter);
-        if input_type %manual input - Tss described in terms of wall dT
-            curr_Tss=num2str(Tps-curr_Superheat+273.15);
-        else %experimental data - Tss directly from the data
-            curr_Tss=num2str(curr_Superheat+273.15);
-        end
+        curr_Helium
         
         clear uVsat uLsat
         %calculate initial temperatures
-        %get saturation conditions (divide by 1e6 to change from bar to Mpa)
-        Tsat_p = IAPWS_IF97('Tsat_p',curr_Pps/1e6*(1-curr_NC));
+        %get saturation conditions (divide by 1e6 to change from Pa to Mpa)
+        Tsat_p = IAPWS_IF97('Tsat_p',curr_Pps)/1e6*(1-curr_NC);
         isnancounter=1;
         % in case pressure is too low for IAPWS, reduce
         % NC mole fraction by 0.01 % and try again and
         % again and again...
         while isnan(Tsat_p)
-            Tsat_p = IAPWS_IF97('Tsat_p',curr_Pps/1e6*(1-curr_NC*(1-0.0001*isnancounter)));
+            Tsat_p = IAPWS_IF97('Tsat_p',curr_Pps)/1e6*(1-curr_NC*(1-0.0001*isnancounter));
             isnancounter=isnancounter+1;
         end
-%                                     isnancounter;
+        %                             isnancounter;
         superheat=200;       % in degrees
         Tps=Tsat_p;
         Theater=num2str(Tsat_p+superheat);
         
-        
+        if input_type %manual input - Tss described in terms of wall dT
+            Tss=num2str(Tps-curr_Superheat);
+        else %experimental data - Tss directly from the data
+            Tss=num2str(curr_Superheat);
+        end
                            
         %get values of parameters for this loop
         %iteration
@@ -252,12 +251,9 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         end
 
         SecondaryPressure=num2str(curr_Pss);
-        if isempty(strfind(SecondaryPressure,'.'))
-            SecondaryPressure(end+1)='.';
-        end
 
-        if isempty(strfind(curr_Tss,'.'))
-            curr_Tss(end+1)='.';
+        if isempty(strfind(Tss,'.'))
+            Tss(end+1)='.';
         end
 
         Heat_flux_strng=num2str(curr_Heatflux);
@@ -297,9 +293,9 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
 
         % specific internal energy calculation
         % from Xsteam
-        uLsat = num2str(1000*XSteam('uL_p',curr_Pps/1e5*(1-curr_NC))); % [J/kg] saturated liquid specific energy, input in Bar
+        uLsat = num2str(1000*XSteam('uL_p',curr_Pps)/1e5*(1-curr_NC)); % [J/kg] saturated liquid specific energy, input in Bar
 
-        uVsat_h2o = 1000*XSteam('uV_p',curr_Pps/1e5*(1-curr_NC)); % [J/kg] saturated vapor specific energy, input in Bar
+        uVsat_h2o = 1000*XSteam('uV_p',curr_Pps)/1e5*(1-curr_NC); % [J/kg] saturated vapor specific energy, input in Bar
         uVsat_N2=5/2*8.314*Tps/molar_mass_N2*1000; % [J/kg], using ideal gas equation for bi atomic gases
         uVsat_He=3/2*8.314*Tps/molar_mass_He*1000; % [J/kg], using ideal gas equation for mono atomic gases
         uVsat=uVsat_h2o*mass_fraction_h2o+uVsat_N2*mass_fraction_Nitrogen+uVsat_He*mass_fraction_Helium; % specific internal energy of mixture Engineering Thermodynamics, pg 378
@@ -328,23 +324,24 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
 
         %remember to remove decimal points, because it screws the
         %file saving to excel later
-        PrimaryPressure_name=num2str(curr_Pps/1e5);
+
+        PrimaryPressure_name=num2str(curr_Pps)/1e5;
         PrimaryPressure_name(PrimaryPressure_name=='.')='-';
 
 %         Heat_flux_withoutdots=num2str(floor(curr_Heatflux));
         %Heat_flux_withoutdots(Heat_flux_withoutdots=='.')=[];
 
-        Mflow_secondary_hours=num2str(curr_Mflowss);
+        Mflow_secondary_hours=num2str(Mflowss(inputDecks_counter));
         %remove dots from Mflow...
         Mflow_secondary_hours_name=Mflow_secondary_hours;
         Mflow_secondary_hours_name(Mflow_secondary_hours_name=='.')='-';
 
-        Mflow_secondary_seconds=curr_Mflowss/3600;
+        Mflow_secondary_seconds=Mflowss(inputDecks_counter)/3600;
         PrimaryTemp_name=num2str(floor(Tps));
         Superheat_name=num2str(floor(curr_Superheat));
 
         % remove dots from power
-        Power_name=num2str(curr_Power);
+        Power_name=Power(inputDecks_counter);
         Power_name(Power_name=='.')='-';
         
         %generate file name and path to file
@@ -629,7 +626,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'*        ctl\n');
         fprintf(fid,'1400200  003\n');
         fprintf(fid,'*        time  pressure    temperature\n');
-        fprintf(fid,'1400201  0.    %s          %s \n',SecondaryPressure, curr_Tss);                  %****************************************************
+        fprintf(fid,'1400201  0.    %s.         %s \n',SecondaryPressure, Tss);                  %****************************************************
         fprintf(fid,'*----------------------------------------------------------------\n');
         fprintf(fid,'* component 150 - inlet junction\n');
         fprintf(fid,'*        name   type\n');
@@ -659,7 +656,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'*        efvcahs                          jun.no.\n');
         fprintf(fid,'1551101  0000000                          %s\n',coolant_water_minus_one);  
         fprintf(fid,'*        ebt  pressure  temperature       vol.no.\n');
-        fprintf(fid,'1551201  003  %s       %s    0.  0.  0.  %s\n', SecondaryPressure, curr_Tss,amount_of_heatexchange_parts);  %****************************************************
+        fprintf(fid,'1551201  003  %s.      %s    0.  0.  0.  %s\n', SecondaryPressure, Tss,amount_of_heatexchange_parts);  %****************************************************
         fprintf(fid,'*        mass flow (=1)\n');
         fprintf(fid,'1551300  1\n');
         fprintf(fid,'*        flowf      flowg  velj          jun.no.\n');
@@ -683,7 +680,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'*        ctl\n');
         fprintf(fid,'1650200  003\n');
         fprintf(fid,'*        time  pressure    temperature\n');
-        fprintf(fid,'1650201  0.    %s          %s \n',SecondaryPressure,curr_Tss);                    %****************************************************
+        fprintf(fid,'1650201  0.    %s.         %s \n',SecondaryPressure,Tss);                    %****************************************************
         fprintf(fid,'\n');
         fprintf(fid,'*================================================================\n');
 
@@ -856,7 +853,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'*         source  intvl\n');
         fprintf(fid,'11501301  0.0     4\n');
         fprintf(fid,'*         temp    intvl\n');
-        fprintf(fid,'11501401  %s     5\n',curr_Tss);                                    %****************************************************
+        fprintf(fid,'11501401  %s     5\n',Tss);                                    %****************************************************
         fprintf(fid,'*         left.vol   incr.  b.c  Surfcode  Surffactor      HS.no.\n');
         fprintf(fid,'11501501  155010000  10000  101  1       %s         %s \n', unit_vertical_height, amount_of_heatexchange_parts);
         fprintf(fid,'*         right.vol  incr.  b.c  Surfcode  Surffactor      HS.no.\n');

@@ -1,12 +1,9 @@
-function [file_list, fileCounter]=filter_tdms_files(directoryname,file_names) 
+function [file_list, fileCounter]=filter_exp_initcond_files(directories)     
 
-    % in case list of files is not given, get one
-    file_list{1}=1;
-    if nargin==1
-        dir_info=dir(directoryname);
-        file_names={dir_info.name};
-    end
-   
+    % get list of files
+    dir_info=dir(directories);
+    file_names={dir_info.name};
+
     % make a table which marks for each file if it has a certain string in
     % the name
     init_files=cellfun(@(x)regexp(x,'RELAP_INPUT'),file_names,'UniformOutput', false);
@@ -26,7 +23,4 @@ function [file_list, fileCounter]=filter_tdms_files(directoryname,file_names)
         end
     end
 
-%     if isempty(file_list)
-%         file_list=1;
-%     end
 end
