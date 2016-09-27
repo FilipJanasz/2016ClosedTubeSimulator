@@ -1,6 +1,4 @@
-function generateRelapInput_annulus_for_experiments(handles,input_type)
-    clc
-    paths=handles.paths;
+function generateRelapInput_annulus_for_experiments(handles,input_type,file_dir)
     %% INPUT----------------------------------------------------
         
         if input_type
@@ -13,32 +11,30 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
 
             %Secondary side - initial and operating conditions ********************************************************************************
             Pss=str2double(get(handles.Pss,'String'));
-            Superheat=str2double(get(handles.Superheat,'String'));  %T_secondary_side = T_primary_side(Pressure_primary_side) - superheat
+            Tss=str2double(get(handles.coolantTemp,'String'));  %T_secondary_side = T_primary_side(Pressure_primary_side) - superheat
             Mflowss=str2double(get(handles.Mflowss,'String'));  %secondary side mass flow [kg/h]
 
             %Heater ********************************************************************************
             Power=str2double(get(handles.Power,'String')); % [W]
+            %technicalities
+            fileCounter=1;
         else
             % AUTO INPUT FROM EXP DATA
-            directories = uigetdir('Pick a directory');
-            [file_list, fileCounter]=filter_exp_initcond_files(directories);
-            directories={directories};
-            dir_amount=1;
-    %         fileCounter={fileCounter};
-            %remove .tdms from the string
-    %         file_list=strrep(file_list,'.xls','');
-    %         file_list={file_list};
-            for doc_counter=1:numel(directories)
-                for file_counter=1:numel(file_list)
-                    [num, ~]=xlsread(strcat(directories{doc_counter},'\', file_list{file_counter}));
-                    Pps(file_counter)=num(1);
-                    NC(file_counter)=num(2);
-                    Helium(file_counter)=num(3);
-                    Pss(file_counter)=num(4);
-                    Superheat(file_counter)=num(5);
-                    Mflowss(file_counter)=num(6);
-                    Power(file_counter)=num(7);
-                end
+            
+            %generate list of input files
+            [directory,fileList]=fileFinder('RELAP_INPUT',1,file_dir);
+            fileCounter=numel(fileList);
+            
+            %read xls input files
+            for file_counter=1:numel(fileList)
+                [num, ~]=xlsread([directory{file_counter},'\', fileList{file_counter}]);
+                Pps(file_counter)=num(1);
+                NC(file_counter)=num(2);
+                Helium(file_counter)=num(3);
+                Pss(file_counter)=num(4);
+                Tss(file_counter)=num(5);
+                Mflowss(file_counter)=num(6);
+                Power(file_counter)=num(7);
             end
         end
         
@@ -102,7 +98,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         molar_mass_N2=28;               % [g/mol]
 
 
-    %% Pre-test calculations
+    %% Pre-test calculations - general
 
         %condensing tube
 
@@ -162,17 +158,9 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
             jacket_diam_outer_string=num2str(jacket_diam_outer);
             cross_section_jacket=num2str(pi*(jacket_diam_inner/2)^2);
 
-        %Counters
-            counterFilename=1;          %used for writing all the file names in one txt file
-            inputDecks_amount=length(Pps);
-
+ 
             disp('Number of input decks:');
-            disp(inputDecks_amount)
-
-%         %preallocate memory for filename txt file
-%             filename=zeros(inputDecks_amount);
-        %open file to which list of input decks will be saved
-            fid1 = fopen(paths.inputDecks,'at');
+            disp(fileCounter)
 
         %write down nodalization for storing
             nodalization{1,1}='amount_of_heater_full';
@@ -203,85 +191,38 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
             end
             disp('Nodalization succesful - good job!')
 
-    %% LOOPS
-    %Generation loop (single, for experimental data comparisons)
-    for inputDecks_counter=1:inputDecks_amount;
+    %% INPUT DECK GENERATION
+
+    for inputDecks_counter=1:fileCounter;
         
+        %get values for current loop iteration
         curr_Pps=Pps(inputDecks_counter);
         curr_NC=NC(inputDecks_counter);
-        curr_Superheat=Superheat(inputDecks_counter);
+        curr_Tss=Tss(inputDecks_counter)+273.15;
         curr_Pss=Pss(inputDecks_counter);
         curr_Heatflux=Heatflux(inputDecks_counter);
         curr_Helium=Helium(inputDecks_counter);
         curr_Mflowss=Mflowss(inputDecks_counter);
         curr_Power=Power(inputDecks_counter);
-        if input_type %manual input - Tss described in terms of wall dT
-            curr_Tss=num2str(Tps-curr_Superheat+273.15);
-        else %experimental data - Tss directly from the data
-            curr_Tss=num2str(curr_Superheat+273.15);
-        end
-        
-        clear uVsat uLsat
+            
         %calculate initial temperatures
         %get saturation conditions (divide by 1e6 to change from bar to Mpa)
         Tsat_p = IAPWS_IF97('Tsat_p',curr_Pps/1e6*(1-curr_NC));
+        % in case pressure is too low for IAPWS, reduce NC mole fraction by 0.01 % and try again and again and again...
         isnancounter=1;
-        % in case pressure is too low for IAPWS, reduce
-        % NC mole fraction by 0.01 % and try again and
-        % again and again...
         while isnan(Tsat_p)
             Tsat_p = IAPWS_IF97('Tsat_p',curr_Pps/1e6*(1-curr_NC*(1-0.0001*isnancounter)));
             isnancounter=isnancounter+1;
         end
-%                                     isnancounter;
+        
+        % assume saturated steam conditions
+        curr_Tps=Tsat_p;  
+                
+        % define temperature of heater wall
         superheat=200;       % in degrees
-        Tps=Tsat_p;
-        Theater=num2str(Tsat_p+superheat);
+        Theater=num2str(Tsat_p+superheat);  
         
-        
-                           
-        %get values of parameters for this loop
-        %iteration
-
-        PrimaryPressure=num2str(curr_Pps);
-        PrimaryTemp=num2str(Tps);
-        %three lines below ensure there's a decimal point - dot in the
-        %string somewhere
-        if isempty(strfind(PrimaryTemp,'.'))
-            PrimaryTemp(end+1)='.';
-        end
-
-        SecondaryPressure=num2str(curr_Pss);
-        if isempty(strfind(SecondaryPressure,'.'))
-            SecondaryPressure(end+1)='.';
-        end
-
-        if isempty(strfind(curr_Tss,'.'))
-            curr_Tss(end+1)='.';
-        end
-
-        Heat_flux_strng=num2str(curr_Heatflux);
-        NC_gas_name=num2str(curr_NC);
-        NC_mole_fr=NC_gas_name;
-        NC_gas_name(NC_gas_name=='.')='-';  %removes dots from string, so it can be used for file name
-
-        Helium_content=num2str(curr_Helium);
-        Nitrogen_content=num2str(1-curr_Helium);
-
-        Helium_content_name=Helium_content;
-        Helium_content_name(Helium_content_name=='.')='-';  %removes dots from string, so it can be used for file name
-
-
-        if isempty(strfind(Helium_content,'.'))
-            Helium_content(end+1)='.';
-        end
-        if isempty(strfind(Nitrogen_content,'.'))
-            Nitrogen_content(end+1)='.';
-        end
-
-        % remove dots from unit vertical height
-        unit_vert_h_name=unit_vertical_height;
-        unit_vert_h_name(unit_vert_h_name=='.')='d'; 
+        %% calculate NC gases - deck specific
         %NC content 
         h2o_mole_fraction=1-curr_NC;
         Helium_mole_fraction=curr_NC*curr_Helium;
@@ -294,70 +235,129 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         mass_fraction_Helium=molar_mass_He/avg_molar_mass_mixture*Helium_mole_fraction;
 
 
-
+        clear uVsat uLsat
         % specific internal energy calculation
         % from Xsteam
-        uLsat = num2str(1000*XSteam('uL_p',curr_Pps/1e5*(1-curr_NC))); % [J/kg] saturated liquid specific energy, input in Bar
+        uLsat = 1000*XSteam('uL_p',curr_Pps/1e5*(1-curr_NC)); % [J/kg] saturated liquid specific energy, input in Bar
 
         uVsat_h2o = 1000*XSteam('uV_p',curr_Pps/1e5*(1-curr_NC)); % [J/kg] saturated vapor specific energy, input in Bar
-        uVsat_N2=5/2*8.314*Tps/molar_mass_N2*1000; % [J/kg], using ideal gas equation for bi atomic gases
-        uVsat_He=3/2*8.314*Tps/molar_mass_He*1000; % [J/kg], using ideal gas equation for mono atomic gases
+        uVsat_N2=5/2*8.314*curr_Tps/molar_mass_N2*1000; % [J/kg], using ideal gas equation for bi atomic gases
+        uVsat_He=3/2*8.314*curr_Tps/molar_mass_He*1000; % [J/kg], using ideal gas equation for mono atomic gases
         uVsat=uVsat_h2o*mass_fraction_h2o+uVsat_N2*mass_fraction_Nitrogen+uVsat_He*mass_fraction_Helium; % specific internal energy of mixture Engineering Thermodynamics, pg 378
         % https://books.google.ch/books?id=MyHZAgAAQBAJ&pg=PA378&lpg=PA378&dq=specific+internal+energy+mixture&source=bl&ots=WhuzuoEpau&sig=x05hyJUzkTcBMHLgID3ho-JsZO8&hl=en&sa=X&ved=0CB4Q6AEwAGoVChMI09Co493TyAIVSZEsCh3tTAzO#v=onepage&q=specific%20internal%20energy%20mixture&f=false
         %                             uVsat=num2str(uVsat-1000000);
         if curr_NC > 0
             uVsat=uVsat*(1+0.5*curr_NC);
         end
+        
+        %% convert values to strings and make sure their contains decimal points - required for RELAP to work
 
+        PrimaryPressure=num2str(curr_Pps);
+        PrimaryTemp=num2str(curr_Tps);
+        SecondaryPressure=num2str(curr_Pss);
+        SecondaryTemp=num2str(curr_Tss);
+        Heat_flux_strng=num2str(curr_Heatflux);
+        NC_mole_fr=num2str(curr_NC);
+        Helium_content=num2str(curr_Helium);
+        Nitrogen_content=num2str(1-curr_Helium);
+        Mflow_secondary_seconds=num2str(curr_Mflowss/3600);
         uVsat=num2str(uVsat);
+        uLsat=num2str(uLsat);
+%         Helium_mole_fraction=num2str(Helium_mole_fraction);
+%         Nitrogen_mole_fraction=num2str(Nitrogen_mole_fraction);
+        
+        if isempty(strfind(PrimaryPressure,'.'))
+            PrimaryPressure(end+1)='.';
+        end   
+        
+        if isempty(strfind(PrimaryTemp,'.'))
+            PrimaryTemp(end+1)='.';
+        end   
+        
+        if isempty(strfind(SecondaryPressure,'.'))
+            SecondaryPressure(end+1)='.';
+        end  
+        
+        if isempty(strfind(SecondaryTemp,'.'))
+            SecondaryTemp(end+1)='.';
+        end   
 
+        if isempty(strfind(curr_Tss,'.'))
+            curr_Tss(end+1)='.';
+        end   
+        
+        if isempty(strfind(Helium_content,'.'))
+            Helium_content(end+1)='.';
+        end
+        
+        if isempty(strfind(Nitrogen_content,'.'))
+            Nitrogen_content(end+1)='.';
+        end       
+               
         if isempty(strfind(uLsat,'.'))
             uLsat(end+1)='.';
         end
+        
         if isempty(strfind(uVsat,'.'))
             uVsat(end+1)='.';
         end
 
-        Helium_mole_fraction=num2str(Helium_mole_fraction);
-        Nitrogen_mole_fraction=num2str(Nitrogen_mole_fraction);
-
-        %check diameter for dots
         if isempty(strfind(heat_tr_hydr_diam,'.'))
             heat_tr_hydr_diam(end+1)='.';
+        end  
+       
+        
+        
+        
+        %% generate file name and path to file
+        if input_type
+            %prepare components for naming
+            
+            % remove dots from strings
+            unit_vert_h_name=unit_vertical_height;
+            unit_vert_h_name(unit_vert_h_name=='.')='d'; 
+            
+            Helium_content_name=Helium_content;
+            Helium_content_name(Helium_content_name=='.')='-';  %removes dots from string, so it can be used for file name
+            
+            NC_gas_name=NC_mole_fr;
+            NC_gas_name(NC_gas_name=='.')='-';  %removes dots from string, so it can be used for file name
+                    
+            PrimaryPressure_name=num2str(curr_Pps/1e5);  %convert to bar
+            PrimaryPressure_name(PrimaryPressure_name=='.')='-';
+        
+            Mflow_secondary_hours_name=num2str(curr_Mflowss);
+            %remove dots from Mflow...
+            Mflow_secondary_hours_name(Mflow_secondary_hours_name=='.')='-';
+            
+            PrimaryTemp_name=num2str(floor(curr_Tps));
+            Tss_name=num2str(floor(curr_Tss));
+        
+            % remove dots from power
+            Power_name=num2str(curr_Power);
+            Power_name(Power_name=='.')='-';
+            
+            deckDescription=[PrimaryPressure_name,'_',PrimaryTemp_name,'_',NC_gas_name,'_',Helium_content_name,'_',Power_name,'_',Tss_name,'_',Mflow_secondary_hours_name,'_',unit_vert_h_name,'_',num2str(condenser_horizontal_cells)];                      %save file name WITHOUT extension
+        else
+            deckDescription=fileList{inputDecks_counter};
+            deckDescription=deckDescription(1:end-12);   %removes _INPUT from the string
         end
 
-        %remember to remove decimal points, because it screws the
-        %file saving to excel later
-        PrimaryPressure_name=num2str(curr_Pps/1e5);
-        PrimaryPressure_name(PrimaryPressure_name=='.')='-';
-
-%         Heat_flux_withoutdots=num2str(floor(curr_Heatflux));
-        %Heat_flux_withoutdots(Heat_flux_withoutdots=='.')=[];
-
-        Mflow_secondary_hours=num2str(curr_Mflowss);
-        %remove dots from Mflow...
-        Mflow_secondary_hours_name=Mflow_secondary_hours;
-        Mflow_secondary_hours_name(Mflow_secondary_hours_name=='.')='-';
-
-        Mflow_secondary_seconds=curr_Mflowss/3600;
-        PrimaryTemp_name=num2str(floor(Tps));
-        Superheat_name=num2str(floor(curr_Superheat));
-
-        % remove dots from power
-        Power_name=num2str(curr_Power);
-        Power_name(Power_name=='.')='-';
-        
-        %generate file name and path to file
-        num2str(condenser_horizontal_cells)
-        fileName=strcat(PrimaryPressure_name,'_',PrimaryTemp_name,'_',NC_gas_name,'_',Helium_content_name,'_',Power_name,'_',Superheat_name,'_',Mflow_secondary_hours_name,'_',unit_vert_h_name,'_',num2str(condenser_horizontal_cells));                      %save file name WITHOUT extension
-        filePath=strcat(paths.dirInput,PrimaryPressure_name,'_',PrimaryTemp_name,'_',NC_gas_name,'_',Helium_content_name,'_',Power_name,'_',Superheat_name,'_',Mflow_secondary_hours_name,'_',unit_vert_h_name,'_',num2str(condenser_horizontal_cells),'.i'); %create file path for current combination
-
-        %store filename in a matrix                          
-        fprintf(fid1,'%s\n',fileName);                         
-        counterFilename=counterFilename+1;
-
         %% WRITE INPUT DECK FILE 
-        fid = fopen(filePath, 'wt'); %open the file
+        
+        %create directory if does not exist
+        storagePath=[file_dir,'\',deckDescription,'_RELAP'];
+        
+        if ~exist(storagePath,'file')
+            mkdir(storagePath)
+        end             
+        
+        %store description of nodalization
+        nodalizationFile=[storagePath,'\nodalization'];
+        save(nodalizationFile,'nodalization');
+        
+        %INPUT DECK
+        fid = fopen([storagePath,'\',deckDescription,'_input_deck.i'], 'wt'); %open the file
 
         %                             heatstr1Temp=num2str(floor((Tps+Tss(Superheat_count))/2));                      %assume heatstructure temp to be an average of PS/SS temperatures [K]
 
@@ -446,7 +446,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         %                             fprintf(fid,'*        ebt  temperature  stat_qual       vol.no.\n');
         %                             fprintf(fid,'1101201  001  %s.      %s          0.  0. 0.   %s \n', PrimaryTemp,NC_mole_fr, amount_of_heater_full_parts); %***************************************************
         fprintf(fid,'*        ebt  pressure  stat_qual         vol.no.\n');
-        fprintf(fid,'1101201  002  %s.   0.     0.  0.  0.     %s \n',PrimaryPressure, amount_of_heater_full_parts); %****************************************************
+        fprintf(fid,'1101201  002  %s    0.     0.  0.  0.     %s \n',PrimaryPressure, amount_of_heater_full_parts); %****************************************************
         %                             fprintf(fid,'*        ebt  pressure temperature        vol.no.\n');
         %                             fprintf(fid,'1101201  003  %s.      %s          0.  0. 0.   %s \n',PrimaryPressure, Theater, amount_of_heater_full_parts); %***************************************************
         %                             fprintf(fid,'*        ebt  pressure temperature  stat_qual       vol.no.\n');
@@ -489,16 +489,16 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         %                             fprintf(fid,'*        ebt  temperature  stat_qual       vol.no.\n');
         %                             fprintf(fid,'1121201  001  %s.      %s          0.  0. 0.   %s \n', PrimaryTemp,NC_mole_fr, amount_of_heater_empty_parts); %***************************************************
             fprintf(fid,'*        ebt  pressure  stat_qual         vol.no.\n');
-            fprintf(fid,'1121201  002  %s.   1.     0.  0.  0.     %s \n',PrimaryPressure, amount_of_heater_empty_parts); %****************************************************
+            fprintf(fid,'1121201  002  %s    1.     0.  0.  0.     %s \n',PrimaryPressure, amount_of_heater_empty_parts); %****************************************************
         %                             fprintf(fid,'*        ebt  pressure temperature        vol.no.\n');
         %                             fprintf(fid,'1121201  003  %s.      %s          0.  0. 0.   %s \n',PrimaryPressure, num2str(Tps), amount_of_heater_empty_parts); %***************************************************
         else
             if initial_cond==4;
                 fprintf(fid,'*        ebt press temp stat_qual vol.no.\n');
-                fprintf(fid,'1121201  004 %s.   %s   %s   0. 0.   %s \n',PrimaryPressure, PrimaryTemp, NC_mole_fr, amount_of_heater_empty_parts); %***************************************************
+                fprintf(fid,'1121201  004 %s    %s   %s   0. 0.   %s \n',PrimaryPressure, PrimaryTemp, NC_mole_fr, amount_of_heater_empty_parts); %***************************************************
             elseif initial_cond==6; 
                 fprintf(fid,'*        ebt press liq_int_en gas_int_en gas_void NC_quality   vol.no.\n');
-                fprintf(fid,'1121201  006 %s. %s %s 1.0 %s %s \n',PrimaryPressure,uLsat,uVsat, NC_mole_fr, amount_of_heater_empty_parts); %***************************************************
+                fprintf(fid,'1121201  006 %s  %s %s 1.0 %s %s \n',PrimaryPressure,uLsat,uVsat, NC_mole_fr, amount_of_heater_empty_parts); %***************************************************
             end
         end                            
         fprintf(fid,'*        mass flow (=1)\n');
@@ -552,14 +552,14 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'1201101  0100000                          %s \n', tube_minus_one);   
         if curr_NC== 0 
                 fprintf(fid,'*        ebt  press  stat_qual         vol.no.\n');
-                fprintf(fid,'1201201  002  %s.    1.     0.  0.  0.     %s \n',PrimaryPressure, amount_of_tube_parts); %****************************************************
+                fprintf(fid,'1201201  002  %s     1.     0.  0.  0.     %s \n',PrimaryPressure, amount_of_tube_parts); %****************************************************
         else
                 if initial_cond==4;
                     fprintf(fid,'*        ebt press temp stat_qual       vol.no.\n');
-                    fprintf(fid,'1201201  004 %s.   %s  %s  0. 0.   %s \n',PrimaryPressure, PrimaryTemp,NC_mole_fr,amount_of_tube_parts); %*****
+                    fprintf(fid,'1201201  004 %s    %s  %s  0. 0.   %s \n',PrimaryPressure, PrimaryTemp,NC_mole_fr,amount_of_tube_parts); %*****
                 elseif initial_cond==6;
                     fprintf(fid,'*       ebt  pressure liq_int_en gas_int_en  gas_void NC_quality   vol.no.\n');
-                    fprintf(fid,'1201201 006 %s. %s %s 1.0 %s %s \n',PrimaryPressure,uLsat,uVsat, NC_mole_fr, amount_of_tube_parts); %***************************************************
+                    fprintf(fid,'1201201 006 %s  %s %s 1.0 %s %s \n',PrimaryPressure,uLsat,uVsat, NC_mole_fr, amount_of_tube_parts); %***************************************************
                 end
         end
         fprintf(fid,'*        mass flow (=1)\n');
@@ -588,14 +588,14 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'1211101  0100000                          %s \n', tube_minus_one);   
         if curr_NC== 0 
                 fprintf(fid,'*        ebt  press  stat_qual         vol.no.\n');
-                fprintf(fid,'1211201  002  %s.    1.     0.  0.  0.     %s \n',PrimaryPressure, amount_of_tube_parts); %****************************************************
+                fprintf(fid,'1211201  002  %s     1.     0.  0.  0.     %s \n',PrimaryPressure, amount_of_tube_parts); %****************************************************
         else
                 if initial_cond==4;
                     fprintf(fid,'*        ebt press temp stat_qual       vol.no.\n');
-                    fprintf(fid,'1211201  004 %s.   %s  %s  0. 0.   %s \n',PrimaryPressure, PrimaryTemp,NC_mole_fr,amount_of_tube_parts); %*****
+                    fprintf(fid,'1211201  004 %s    %s  %s  0. 0.   %s \n',PrimaryPressure, PrimaryTemp,NC_mole_fr,amount_of_tube_parts); %*****
                 elseif initial_cond==6;
                     fprintf(fid,'*       ebt  pressure liq_int_en gas_int_en  gas_void NC_quality   vol.no.\n');
-                    fprintf(fid,'1211201 006 %s. %s %s 1.0 %s %s \n',PrimaryPressure,uLsat,uVsat, NC_mole_fr, amount_of_tube_parts); %***************************************************
+                    fprintf(fid,'1211201 006 %s  %s %s 1.0 %s %s \n',PrimaryPressure,uLsat,uVsat, NC_mole_fr, amount_of_tube_parts); %***************************************************
                 end
         end
         fprintf(fid,'*        mass flow (=1)\n');
@@ -629,7 +629,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'*        ctl\n');
         fprintf(fid,'1400200  003\n');
         fprintf(fid,'*        time  pressure    temperature\n');
-        fprintf(fid,'1400201  0.    %s          %s \n',SecondaryPressure, curr_Tss);                  %****************************************************
+        fprintf(fid,'1400201  0.    %s          %s \n',SecondaryPressure, SecondaryTemp);                  %****************************************************
         fprintf(fid,'*----------------------------------------------------------------\n');
         fprintf(fid,'* component 150 - inlet junction\n');
         fprintf(fid,'*        name   type\n');
@@ -659,7 +659,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'*        efvcahs                          jun.no.\n');
         fprintf(fid,'1551101  0000000                          %s\n',coolant_water_minus_one);  
         fprintf(fid,'*        ebt  pressure  temperature       vol.no.\n');
-        fprintf(fid,'1551201  003  %s       %s    0.  0.  0.  %s\n', SecondaryPressure, curr_Tss,amount_of_heatexchange_parts);  %****************************************************
+        fprintf(fid,'1551201  003  %s       %s    0.  0.  0.  %s\n', SecondaryPressure, SecondaryTemp,amount_of_heatexchange_parts);  %****************************************************
         fprintf(fid,'*        mass flow (=1)\n');
         fprintf(fid,'1551300  1\n');
         fprintf(fid,'*        flowf      flowg  velj          jun.no.\n');
@@ -683,7 +683,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'*        ctl\n');
         fprintf(fid,'1650200  003\n');
         fprintf(fid,'*        time  pressure    temperature\n');
-        fprintf(fid,'1650201  0.    %s          %s \n',SecondaryPressure,curr_Tss);                    %****************************************************
+        fprintf(fid,'1650201  0.    %s          %s \n',SecondaryPressure,SecondaryTemp);                    %****************************************************
         fprintf(fid,'\n');
         fprintf(fid,'*================================================================\n');
 
@@ -856,7 +856,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
         fprintf(fid,'*         source  intvl\n');
         fprintf(fid,'11501301  0.0     4\n');
         fprintf(fid,'*         temp    intvl\n');
-        fprintf(fid,'11501401  %s     5\n',curr_Tss);                                    %****************************************************
+        fprintf(fid,'11501401  %s     5\n',SecondaryTemp);                                    %****************************************************
         fprintf(fid,'*         left.vol   incr.  b.c  Surfcode  Surffactor      HS.no.\n');
         fprintf(fid,'11501501  155010000  10000  101  1       %s         %s \n', unit_vertical_height, amount_of_heatexchange_parts);
         fprintf(fid,'*         right.vol  incr.  b.c  Surfcode  Surffactor      HS.no.\n');
@@ -912,34 +912,9 @@ function generateRelapInput_annulus_for_experiments(handles,input_type)
 
         fclose(fid); %close the file
 
-        %store description of nodalization
-        %open file to write nodalization log
-        processing_path=['',paths.dirOutput,fileName,'\',''];
-        mkdir(processing_path);
-        nod_file_path=[processing_path,'nodalization'];
-        save(nod_file_path,'nodalization');
-        %                             fid_nod=fopen(strcat(processing_path,'nodalization.txt'),'wt');
-        %                             fprintf(fid_nod,'amount_of_heater_full %s\n',num2str(amount_of_heater_full));
-        %                             fprintf(fid_nod,'amount_of_heater_empty %s\n',num2str(amount_of_heater_empty));
-        %                             fprintf(fid_nod,'amount_of_tube_parts %s\n',num2str(amount_of_tube_parts));
-        %                             fprintf(fid_nod,'amount_of_coolant_water %s\n',num2str(amount_of_coolant_water));
-        %                             fprintf(fid_nod,'condenser_horizontal_cells %s\n',num2str(condenser_horizontal_cells));
-        %                             fclose(fid_nod);
-
+        
     end
-
-    %% Close file and generate log file
-        fclose('all'); %close namelist file
-
+ 
           disp('Input decks generated succesfully!')
-          disp('List of files is available in main directory in input_decks_list.txt');
-
-        %generate log file with information like batch_size, starting_file
-        fid2=fopen(paths.log,'w');
-        fprintf(fid2,'starting_file=1\n');
-        fprintf(fid2,'batch_size=4\n');
-        fprintf(fid2,'processed_amount=0\n');
-        fprintf(fid2,'starting_batch=1\n');
-        fclose(fid2);
 
 end

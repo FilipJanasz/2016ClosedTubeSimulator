@@ -22,5 +22,4 @@ function [file_list, fileCounter]=filter_exp_initcond_files(directories)
             file_list{fileCounter}=file_names{i};
         end
     end
-
 end

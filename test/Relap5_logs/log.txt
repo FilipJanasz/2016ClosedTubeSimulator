@@ -1,4 +1,0 @@
-starting_file=5
-batch_size=4
-processed_amount=4
-starting_batch=2

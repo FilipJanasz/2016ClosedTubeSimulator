@@ -14,7 +14,9 @@ execution_time=150400;
 starting_batch=1;
 
 %set license as enviromental variable
-license='018401502097157222077118';
+lic_file=fopen([paths.dirCode,'\license.txt']);
+license=textscan(lic_file,'%s');
+fclose(lic_file);
 setenv('rslicense',license);
 %REMEMBER ABOUT SETTING UP ENV VAR FOR RS LICENSE!!!!!
 
@@ -23,55 +25,55 @@ clear input_decks_list input_decks_number
 
 userChoice=menu('Choose your processing option','Point to a directory and process all .i files within it and all subdirectories', 'Point to a file');   
    
-    if userChoice==1
-        
-        %display gui to pick directory
-        directoryname = uigetdir('Pick a directory');
-        
-        %GET ALL FILES FROM DIRECTORY AND SUBFOLDERS
-        [subDirectories,file_names]=subdir(directoryname);
+if userChoice==1
 
-        %mark all cells which contain a name of .i file - BUT keep the
-        %subfolder structure, i.e. each cell of r_files is a subfolder,
-        %which then contains files
-        r_files=cellfun(@(x)strfind(x,'.i'),file_names,'UniformOutput', false);
+    %display gui to pick directory
+    directoryname = uigetdir('Pick a directory');
 
-        %find their positions in inner cells
-        fileCounter=1;
-        allFiles=numel(r_files);
+    %GET ALL FILES FROM DIRECTORY AND SUBFOLDERS
+    [subDirectories,file_names]=subdir(directoryname);
 
-        for counter=1:allFiles
+    %mark all cells which contain a name of .i file - BUT keep the
+    %subfolder structure, i.e. each cell of r_files is a subfolder,
+    %which then contains files
+    r_files=cellfun(@(x)strfind(x,'.i'),file_names,'UniformOutput', false);
 
-            table{counter}=find(~cellfun(@isempty,r_files{counter}));
-            
-            for table_counter=1:numel(table{counter})
-                if ~isempty(table{counter}(table_counter))
-                    x=table{counter}(table_counter);
+    %find their positions in inner cells
+    fileCounter=1;
+    allFiles=numel(r_files);
 
-                    %store names of r files
-                    input_decks_list{fileCounter}=file_names{counter}{x};
+    for counter=1:allFiles
 
-                    %store names of directories which contain .i files
-                    directory{fileCounter}=subDirectories{counter};
+        table{counter}=find(~cellfun(@isempty,r_files{counter}));
 
-                    %increase counter
-                    fileCounter=fileCounter+1;
+        for table_counter=1:numel(table{counter})
+            if ~isempty(table{counter}(table_counter))
+                x=table{counter}(table_counter);
 
-                end
+                %store names of r files
+                input_decks_list{fileCounter}=file_names{counter}{x};
+
+                %store names of directories which contain .i files
+                directory{fileCounter}=subDirectories{counter};
+
+                %increase counter
+                fileCounter=fileCounter+1;
+
             end
-
         end
-               
-    elseif userChoice==2
-            
-            [input_decks_list,directory,FilterIndex] = uigetfile('*.i','Choose .i file to process','MultiSelect','on');   
-            directory=directory(1:end-1);
-            directory={directory};
-            
-            if ~iscell(input_decks_list)
-                input_decks_list={input_decks_list};
-            end
+
     end
+
+elseif userChoice==2
+
+        [input_decks_list,directory,FilterIndex] = uigetfile('*.i','Choose .i file to process','MultiSelect','on');   
+        directory=directory(1:end-1);
+        directory={directory};
+
+        if ~iscell(input_decks_list)
+            input_decks_list={input_decks_list};
+        end
+end
 
 
 input_decks_number=numel(input_decks_list);
