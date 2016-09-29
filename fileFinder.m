@@ -1,8 +1,8 @@
-function [directories, input_decks_list_stripped]=fileFinder(fileCharacteristic,firstCall,subdirectoryname)
+function [directories, input_decks_list_stripped]=fileFinder(fileCharacteristic,firstCall,subdirectoryname,firstInSeq)
     %creates a lists of files in a chosen folder, based on a desired
     %string in the name
     %display gui to pick directory
-    if firstCall
+    if firstCall && firstInSeq
         directoryname = uigetdir(subdirectoryname,'Pick a directory');
     else
         directoryname=subdirectoryname;
@@ -58,8 +58,8 @@ function [directories, input_decks_list_stripped]=fileFinder(fileCharacteristic,
             %check if returned values contain any directories - if not,
             %number of non zero elements
             if subdir_input_decks{1,1}~=0
-                input_decks_list_stripped=[input_decks_list_stripped subdir_input_decks];
-                directories=[directories subdir_directories];
+                input_decks_list_stripped=[input_decks_list_stripped subdir_input_decks]; %#ok<AGROW>
+                directories=[directories subdir_directories];   %#ok<AGROW>
             end
         end
     end

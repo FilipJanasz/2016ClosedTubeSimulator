@@ -1,28 +1,28 @@
-function generateRelapInput_annulus_for_experiments(handles,input_type,file_dir)
+function generateRelapInput_annulus_for_experiments(inputs,input_type,file_dir)
     %% INPUT----------------------------------------------------
         
         if input_type
             % MANUAL INPUT
             %Primary side - initial conditions  ********************************************************************************
 
-            Pps=str2double(get(handles.Pps,'String'));         %Initial pressure [Bar]
-            NC=str2double(get(handles.NC,'String'));               %Non condensable mole fr (quality in relap)
-            Helium=str2double(get(handles.Helium,'String'));           %Mole fraction of Helium in NC mixture
+            Pps=str2double(get(inputs.Pps,'String'));         %Initial pressure [Bar]
+            NC=str2double(get(inputs.NC,'String'));               %Non condensable mole fr (quality in relap)
+            Helium=str2double(get(inputs.Helium,'String'));           %Mole fraction of Helium in NC mixture
 
             %Secondary side - initial and operating conditions ********************************************************************************
-            Pss=str2double(get(handles.Pss,'String'));
-            Tss=str2double(get(handles.coolantTemp,'String'));  %T_secondary_side = T_primary_side(Pressure_primary_side) - superheat
-            Mflowss=str2double(get(handles.Mflowss,'String'));  %secondary side mass flow [kg/h]
+            Pss=str2double(get(inputs.Pss,'String'));
+            Tss=str2double(get(inputs.coolantTemp,'String'));  %T_secondary_side = T_primary_side(Pressure_primary_side) - superheat
+            Mflowss=str2double(get(inputs.Mflowss,'String'));  %secondary side mass flow [kg/h]
 
             %Heater ********************************************************************************
-            Power=str2double(get(handles.Power,'String')); % [W]
+            Power=str2double(get(inputs.Power,'String')); % [W]
             %technicalities
             fileCounter=1;
         else
             % AUTO INPUT FROM EXP DATA
             
             %generate list of input files
-            [directory,fileList]=fileFinder('RELAP_INPUT',1,file_dir);
+            [directory,fileList]=fileFinder('RELAP_INPUT',1,file_dir,1);
             fileCounter=numel(fileList);
             
             %read xls input files
@@ -81,17 +81,36 @@ function generateRelapInput_annulus_for_experiments(handles,input_type,file_dir)
         jacket_diam_outer=0.1143;       % [m]
 
 
-        %Relap Calculation parameters
-        initial_endtime='600.';
-        endtime='40000.';
-        mindt='1.e-8';
-        initial_maxdt='1e-3';
-        final_maxdt='1e-2';
-        minor='50000';
-        major='100000';
-        restart='100000';
-        initial_cond=4;  % controls how initial conditions are defined for volumes with NC - either by pressure / temp for option 4 or with specific energies 6
-
+        %Relap Calculation parameters 
+%         mindt='1.e-8';
+%         initial_maxdt='1e-3';
+%         final_maxdt='1e-2';
+%         initial_endtime='600.';
+%         endtime='40000.';
+%         minor='50000';
+%         major='100000';
+%         restart='100000';
+%         initial_cond=4;
+        mindt=inputs.mindt;
+        initial_maxdt=inputs.initial_maxdt;
+        final_maxdt=inputs.final_maxdt;
+        initial_endtime=[inputs.initial_endtime,'.'];
+        endtime=[inputs.endtime,'.'];
+        minor=inputs.minor;
+        major=inputs.major;
+        restart=inputs.restart;
+        initial_cond_choice=inputs.initial_cond;  
+        % set how initial conditions are defined for volumes with NC
+        % numbering consistent with RELAP5 options for inital condition cards XXXX1201
+        switch initial_cond_choice
+            case 1
+                %pressure / temp - option 4
+                initial_cond=4;
+            case 2
+                %specific energies - option 6
+                initial_cond=6;
+        end
+                
         %Properties
         molar_mass_h2o=18.01528;        % [g/mol]
         molar_mass_He=4.0026;           % [g/mol]
@@ -281,10 +300,6 @@ function generateRelapInput_annulus_for_experiments(handles,input_type,file_dir)
         if isempty(strfind(SecondaryTemp,'.'))
             SecondaryTemp(end+1)='.';
         end   
-
-        if isempty(strfind(curr_Tss,'.'))
-            curr_Tss(end+1)='.';
-        end   
         
         if isempty(strfind(Helium_content,'.'))
             Helium_content(end+1)='.';
@@ -318,7 +333,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type,file_dir)
             unit_vert_h_name(unit_vert_h_name=='.')='d'; 
             
             Helium_content_name=Helium_content;
-            Helium_content_name(Helium_content_name=='.')='-';  %removes dots from string, so it can be used for file name
+            Helium_content_name(Helium_content_name=='.')='';  %removes dots from string, so it can be used for file name
             
             NC_gas_name=NC_mole_fr;
             NC_gas_name(NC_gas_name=='.')='-';  %removes dots from string, so it can be used for file name
@@ -876,7 +891,7 @@ function generateRelapInput_annulus_for_experiments(handles,input_type,file_dir)
 
         fprintf(fid,'** stainless steel \n');
         fprintf(fid,'20100100  tbl/fctn  1  1 \n');
-        fprintf(fid,'*conduct. vs temp.     \n');
+        fprintf(fid,'*therm. con. vs temp.     \n');
         fprintf(fid,'20100101  265.0  7.58 \n');
         fprintf(fid,'20100102  295.0  7.58 \n');
         fprintf(fid,'20100103  550.0  13.43 \n');

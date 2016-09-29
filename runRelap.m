@@ -1,4 +1,4 @@
-function runRelap(dirCode,default_dir,starting_file,execution_time,starting_batch,batch_size)
+function runRelap(dirCode,default_dir,starting_file,execution_time,starting_batch,batch_size,sequence,firstInSeq)
     
     %set license as enviromental variable
     try
@@ -13,22 +13,29 @@ function runRelap(dirCode,default_dir,starting_file,execution_time,starting_batc
 
     %import input decks list form file created by runRelapCalculation.m
     clear input_decks_list input_decks_number
-    
-    userChoice=menu('Choose your processing option','Point to a directory and process all .i files within it and all subdirectories', 'Point to a file');   
-   
-    if userChoice==1
-        %creates a lists of files in a chosen folder, based on a desired
-        %string in the name
-        [directories,input_decks_list]=fileFinder('.i',1,default_dir);
-    elseif userChoice==2
+    if ~sequence
+        userChoice=menu('Choose your processing option','Point to a directory and process all .i files within it and all subdirectories', 'Point to a file');   
 
-            [input_decks_list,~,~] = uigetfile('*.i','Choose .i file to process','MultiSelect','on');   
+        if userChoice==1
+            %creates a lists of files in a chosen folder, based on a desired
+            %string in the name
+            [directories,input_decks_list]=fileFinder('.i',1,default_dir,1);
+        elseif userChoice==2
 
-            if ~iscell(input_decks_list)
-                input_decks_list={input_decks_list};
-            end
+                [input_decks_list,directories,~] = uigetfile('*.i','Choose .i file to process','MultiSelect','on');   
+                input_decks_list=input_decks_list(1:end-2);  %removes .i
+                if ~iscell(input_decks_list)
+                    input_decks_list={input_decks_list};
+                end
+                directories=directories(1:end-1); %removes \ sign
+                if ~iscell(directories)
+                    directories={directories};
+                end
+        end
+    else
+        [directories, input_decks_list]=fileFinder('.i',1,default_dir,firstInSeq);
     end
-%     directory
+
     input_decks_number=numel(input_decks_list);
     batch_amount=(input_decks_number-starting_file+1)/batch_size;
 
@@ -49,14 +56,50 @@ function runRelap(dirCode,default_dir,starting_file,execution_time,starting_batc
     %processing loop (outer loop runs batches for an hour, inner loop opens
     %number of files, specified in batch_size at once in Relap5
     for m=starting_batch:batch_count
+        disp('Reading new batch of files')
         for n=starting_file:starting_file+batch_size-1
 
             fileName=input_decks_list{n};
             fileDir=directories{n};
             inputFile=[fileDir,'\',fileName,'.i -o '];
-            outputOfile=[fileDir,'\',fileName(1:end-11),'_output_O.o -r '];
-            outputRfile=[fileDir,'\',fileName(1:end-11),'_output_R.r -w '];
-            command=[dirCode,'relap5 -i ',inputFile,outputOfile,outputRfile,dirCode,'tpfh2o &'];
+            outputOfile=[fileDir,'\',fileName(1:end-11),'_output_O.o'];
+            outputRfile=[fileDir,'\',fileName(1:end-11),'_output_R.r'];
+            %check if o and r files already exists - RELAP cannot continue
+            %if they do - either stop calculation, or delete
+            r_exist=exist(outputOfile,'file');
+            o_exist=exist(outputRfile,'file');
+            if r_exist && ~o_exist
+                button = questdlg('RELAP .o already exists','Action required','Overwrite','Keep','Stop code','Overwrite');
+                if strcmp(button,'Overwrite')
+                    delete(outputOfile)
+                elseif strcmp(button,'Keep')
+                    outputOfile=[outputOfile(1:end-2),'v2','.o'];
+                else
+                    return
+                end
+            elseif ~r_exist && o_exist
+                button = questdlg('RELAP .r file already exists','Action required','Overwrite','Keep','Stop code','Overwrite');
+                if strcmp(button,'Overwrite')
+                    delete(outputRfile)
+                elseif strcmp(button,'Keep')
+                    outputRfile=[outputRfile(1:end-2),'v2','.r'];
+                else
+                    return
+                end
+            elseif r_exist && o_exist
+                button = questdlg('RELAP .r and o. files already exist?','Action required','Overwrite','Keep','Stop code','Overwrite');
+                if strcmp(button,'Overwrite')
+                    delete(outputOfile)
+                    delete(outputRfile)
+                elseif strcmp(button,'Keep')
+                    outputOfile=[outputOfile(1:end-2),'v2','.o'];
+                    outputRfile=[outputRfile(1:end-2),'v2','.r'];
+                else
+                    return
+                end
+            end
+            
+            command=[dirCode,'relap5 -i ',inputFile,outputOfile,' -r ',outputRfile,' -w ',dirCode,'tpfh2o &'];
 %             command=cell2mat(command); %convert cell array to a matrix
             dos(command);
           
@@ -81,8 +124,8 @@ function runRelap(dirCode,default_dir,starting_file,execution_time,starting_batc
         disp(['3/4 execution time passed ',num2str(execution_time*0.75),'s'])
         pause(execution_time/4)
         disp(['Execution finished after ',num2str(execution_time),'s']) 
-        disp('Reading new batch of files')
-        dos('taskkill /im relap5.exe')
+        
+        dos('taskkill /im relap5.exe');
     end
-
+    disp('All RELAP5 runs executed')
 end
