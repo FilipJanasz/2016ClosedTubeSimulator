@@ -83,17 +83,23 @@ function genInput_Callback(hObject, eventdata, handles) %#ok<DEFNU>
     
     %get directory close to user wishes
     default_dir=get(handles.file_path,'String');
+    
     %check if the input is manual or automatic (from experiment)
     input_type=get(handles.inputManual,'Value');
+    
     %get calculation parameters
+    handles.mindt=get(handles.mindtBox,'String');  %the trick with multiplying by then is due to the fact, than when XdT is specified, relap uses value 10 times less - depends on how 1e-3 is iterpreted apparently
+    handles.initial_maxdt=get(handles.initial_maxdtBox,'String');
+    handles.final_maxdt=num2str(str2double(get(handles.final_maxdtBox,'String');
+    handles.initial_endtime=get(handles.initial_endtimeBox,'String');
     handles.endtime=get(handles.endtimeBox,'String');
-    handles.mindt=get(handles.mindtBox,'String');
-    handles.initial_maxdtBox=get(handles.initial_maxdtBox,'String');
-    handles.final_maxdtBox=get(handles.final_maxdtBox,'String');
-    handles.minorBox=get(handles.minorBox,'String');
-    handles.majorBox=get(handles.majorBox,'String');
-    handles.restartBox=get(handles.restartBox,'String');
-    handles.initial_condBox=get(handles.initial_condBox,'String');
+    %take value specificed by user (in seconds), divide it by final dT (also in seconds, multiplied by 10
+    %to agree with RELAP way of handling thins and what you get is a frequency
+    handles.minor=num2str(str2double(get(handles.minorBox,'String'))/str2double(get(handles.final_maxdtBox,'String'))*10);
+    handles.major=num2str(str2double(get(handles.majorBox,'String'))/str2double(get(handles.final_maxdtBox,'String'))*10);
+    handles.restart=get(handles.restartBox,'String');
+    handles.initial_cond=get(handles.initial_condBox,'Value');
+    
     %generate input decks
     generateRelapInput_annulus_for_experiments(handles,input_type,default_dir)
     
@@ -194,6 +200,20 @@ function sequence_Callback(hObject, eventdata, handles) %#ok<DEFNU>
     if genFlag  
         %check if the input is manual or automatic (from experiment)
         input_type=get(handles.inputManual,'Value');
+        
+         %get calculation parameters
+        handles.mindt=get(handles.mindtBox,'String');
+        handles.initial_maxdt=get(handles.initial_maxdtBox,'String');
+        handles.final_maxdt=num2str(str2double(get(handles.final_maxdtBox,'String')));
+        handles.initial_endtime=get(handles.initial_endtimeBox,'String');
+        handles.endtime=get(handles.endtimeBox,'String');
+        %take value specificed by user (in seconds), divide it by final dT (also in seconds, multiplied by 10
+        %to agree with RELAP way of handling thins and what you get is a frequency
+        handles.minor=num2str(str2double(get(handles.minorBox,'String'))/str2double(get(handles.final_maxdtBox,'String')));
+        handles.major=num2str(str2double(get(handles.majorBox,'String'))/str2double(get(handles.final_maxdtBox,'String')));
+        handles.restart=num2str(str2double(get(handles.restartBox,'String'))/str2double(get(handles.final_maxdtBox,'String')));
+        handles.initial_cond=get(handles.initial_condBox,'Value');
+    
         %generate input decks
         generateRelapInput_annulus_for_experiments(handles,input_type,default_dir)
         disp('-------------------------------------------')

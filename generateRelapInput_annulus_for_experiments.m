@@ -82,15 +82,6 @@ function generateRelapInput_annulus_for_experiments(inputs,input_type,file_dir)
 
 
         %Relap Calculation parameters 
-%         mindt='1.e-8';
-%         initial_maxdt='1e-3';
-%         final_maxdt='1e-2';
-%         initial_endtime='600.';
-%         endtime='40000.';
-%         minor='50000';
-%         major='100000';
-%         restart='100000';
-%         initial_cond=4;
         mindt=inputs.mindt;
         initial_maxdt=inputs.initial_maxdt;
         final_maxdt=inputs.final_maxdt;
@@ -100,6 +91,7 @@ function generateRelapInput_annulus_for_experiments(inputs,input_type,file_dir)
         major=inputs.major;
         restart=inputs.restart;
         initial_cond_choice=inputs.initial_cond;  
+        
         % set how initial conditions are defined for volumes with NC
         % numbering consistent with RELAP5 options for inital condition cards XXXX1201
         switch initial_cond_choice

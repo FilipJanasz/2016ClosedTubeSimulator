@@ -75,7 +75,7 @@ function runRelap(dirCode,default_dir,starting_file,execution_time,starting_batc
                 elseif strcmp(button,'Keep')
                     outputOfile=[outputOfile(1:end-2),'v2','.o'];
                 else
-                    return
+                    error('Execution interrupted')
                 end
             elseif ~r_exist && o_exist
                 button = questdlg('RELAP .r file already exists','Action required','Overwrite','Keep','Stop code','Overwrite');
@@ -84,7 +84,7 @@ function runRelap(dirCode,default_dir,starting_file,execution_time,starting_batc
                 elseif strcmp(button,'Keep')
                     outputRfile=[outputRfile(1:end-2),'v2','.r'];
                 else
-                    return
+                    error('Execution interrupted')
                 end
             elseif r_exist && o_exist
                 button = questdlg('RELAP .r and o. files already exist?','Action required','Overwrite','Keep','Stop code','Overwrite');
@@ -95,7 +95,7 @@ function runRelap(dirCode,default_dir,starting_file,execution_time,starting_batc
                     outputOfile=[outputOfile(1:end-2),'v2','.o'];
                     outputRfile=[outputRfile(1:end-2),'v2','.r'];
                 else
-                    return
+                    error('Execution interrupted')
                 end
             end
             

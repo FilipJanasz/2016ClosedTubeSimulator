@@ -93,9 +93,13 @@ function genInput_Callback(hObject, eventdata, handles) %#ok<DEFNU>
     handles.final_maxdt=get(handles.final_maxdtBox,'String');
     handles.initial_endtime=get(handles.initial_endtimeBox,'String');
     handles.endtime=get(handles.endtimeBox,'String');
-    handles.minor=get(handles.minorBox,'String');
-    handles.major=get(handles.majorBox,'String');
-    handles.restart=get(handles.restartBox,'String');
+    %take value specificed by user (in seconds), divide it by final dT (also in seconds) and what you get is a frequency
+    %heep major restart and minor the same to keep data storage period
+    %constant - otherwise you'll get multiple frequencies of storage
+    %(with major, restart and minor being three frequencies)
+    handles.minor=num2str(str2double(get(handles.minorBox,'String'))/str2double(handles.final_maxdt));
+    handles.major=handles.minor;
+    handles.restart=handles.minor;
     handles.initial_cond=get(handles.initial_condBox,'Value');
     
     %generate input decks
@@ -199,15 +203,19 @@ function sequence_Callback(hObject, eventdata, handles) %#ok<DEFNU>
         %check if the input is manual or automatic (from experiment)
         input_type=get(handles.inputManual,'Value');
         
-        %get calculation parameters
+         %get calculation parameters
         handles.mindt=get(handles.mindtBox,'String');
         handles.initial_maxdt=get(handles.initial_maxdtBox,'String');
-        handles.final_maxdt=get(handles.final_maxdtBox,'String');
+        handles.final_maxdt=num2str(str2double(get(handles.final_maxdtBox,'String')));
         handles.initial_endtime=get(handles.initial_endtimeBox,'String');
         handles.endtime=get(handles.endtimeBox,'String');
-        handles.minor=get(handles.minorBox,'String');
-        handles.major=get(handles.majorBox,'String');
-        handles.restart=get(handles.restartBox,'String');
+        %take value specificed by user (in seconds), divide it by final dT (also in seconds) and what you get is a frequency
+        %heep major restart and minor the same to keep data storage period
+        %constant - otherwise you'll get multiple frequencies of storage
+        %(with major, restart and minor being three frequencies)
+        handles.minor=num2str(str2double(get(handles.minorBox,'String'))/str2double(handles.final_maxdt));
+        handles.major=handles.minor;
+        handles.restart=handles.minor;
         handles.initial_cond=get(handles.initial_condBox,'Value');
     
         %generate input decks

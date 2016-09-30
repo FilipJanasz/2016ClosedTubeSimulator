@@ -28,7 +28,7 @@ function plotter_mat(default_dir,sequence,firstInSeq)
     number_of_processed_files=numel(processed_files_list);
 
     %define parameters to be plotted
-    parameters2process={'sattemp','tempf','tempg','p','quala','rho','floreg','velg','velf','htvat','voidg','htrnr','vapgen','tmassv'};
+    parameters2process={'sattemp','tempf','tempg','p','quala','rho','floreg','velg','velf','htvat','voidg','htrnr','vapgen','tmassv','qualan1'};
     parameters2process_secondary={'tempf_secondary','p_secondary','vapgen_secondary','htvat_secondary'};
     parametersAmount=numel(parameters2process);  
     parametersAmount_secondary=numel(parameters2process_secondary);
@@ -130,82 +130,90 @@ function plotter_mat(default_dir,sequence,firstInSeq)
 
                 loc=strcmp(parameter,data(:,1));
                 position=find(loc);
-                paramValue_all=data(position(1):position(end),:);
+                %verify that said parameters data is present
+                if ~isempty(position)
+                    paramValue_all=data(position(1):position(end),:);
 
-                % depending on which parameter, and nodalization, find values for given parameters     
-                if strcmp(parameter,'htvat') 
-                    paramValue_primarypipe=cell2mat(paramValue_all(1:tube_vol_heatstr,starting_column:end));
-                    paramValue_secondarypipe=cell2mat(paramValue_all((ss_start_heatstr-1):(ss_end_heatstr-1),starting_column:end));
-                elseif strcmp(parameter,'htrnr')
-                    paramValue_primarypipe=cell2mat(paramValue_all(1:2:(2*tube_vol),starting_column:end));
-                    paramValue_secondarypipe=cell2mat(paramValue_all((2*tube_vol+1):2:(2*tube_vol+2*nodalization{4,2}),starting_column:end));
-                elseif strcmp(parameter,'tmassv')
-                    paramValue_primarypipe=cell2mat(paramValue_all(1:tube_vol,starting_column:end));  
-                    if nodalization{5,2}>1
-                        command_inter='paramValue_horztube_interleaved=reshape([';
-                        for horztube_counter=1:numel(horz_tub_pos)
-                            paramValue_horztube{horztube_counter}=cell2mat(paramValue_all(horz_tub_pos(horztube_counter):(horz_tub_pos(horztube_counter)+nodalization{3,2}-1),starting_column:end));
-                            command_inter=[command_inter,'paramValue_horztube{',num2str(horztube_counter),'};'];
+                    % depending on which parameter, and nodalization, find values for given parameters     
+                    if strcmp(parameter,'htvat') 
+                        paramValue_primarypipe=cell2mat(paramValue_all(1:tube_vol_heatstr,starting_column:end));
+                        paramValue_secondarypipe=cell2mat(paramValue_all((ss_start_heatstr-1):(ss_end_heatstr-1),starting_column:end));
+                    elseif strcmp(parameter,'htrnr')
+                        paramValue_primarypipe=cell2mat(paramValue_all(1:2:(2*tube_vol),starting_column:end));
+                        paramValue_secondarypipe=cell2mat(paramValue_all((2*tube_vol+1):2:(2*tube_vol+2*nodalization{4,2}),starting_column:end));
+                    elseif strcmp(parameter,'tmassv')
+                        paramValue_primarypipe=cell2mat(paramValue_all(1:tube_vol,starting_column:end));  
+                        if nodalization{5,2}>1
+                            command_inter='paramValue_horztube_interleaved=reshape([';
+                            for horztube_counter=1:numel(horz_tub_pos)
+                                paramValue_horztube{horztube_counter}=cell2mat(paramValue_all(horz_tub_pos(horztube_counter):(horz_tub_pos(horztube_counter)+nodalization{3,2}-1),starting_column:end));
+                                command_inter=[command_inter,'paramValue_horztube{',num2str(horztube_counter),'};'];
+                            end
+
+                            command_inter=[command_inter,'],',num2str(nodalization{3,2}),',[]);'];   % 30 - two times the number of vertical volumes
+                            eval(command_inter);
                         end
+                    else
+                        paramValue_primarypipe=cell2mat(paramValue_all(1: tube_vol,starting_column:end));
+                        paramValue_secondarypipe=cell2mat(paramValue_all(ss_start_vol:ss_end_vol,starting_column:end));                
+                        if nodalization{5,2}>1
+                            command_inter='paramValue_horztube_interleaved=reshape([';
+                            for horztube_counter=1:numel(horz_tub_pos)
+                                paramValue_horztube{horztube_counter}=cell2mat(paramValue_all(horz_tub_pos(horztube_counter):(horz_tub_pos(horztube_counter)+nodalization{3,2}-1),starting_column:end));
+                                command_inter=[command_inter,'paramValue_horztube{',num2str(horztube_counter),'};'];
+                            end
 
-                        command_inter=[command_inter,'],',num2str(nodalization{3,2}),',[]);'];   % 30 - two times the number of vertical volumes
-                        eval(command_inter);
+                            command_inter=[command_inter,'],',num2str(nodalization{3,2}),',[]);'];   % 30 - two times the number of vertical volumes
+                            eval(command_inter);
+                        end
+                    end
+
+                    %from to are set to last, to plot only last plot
+                    from=numel(paramValue_primarypipe(1,:));
+                    to=numel(paramValue_primarypipe(1,:));
+
+                    %prepare list of files for plotting legend
+
+                    file_list_plot{n_file}=file_name;
+                    file_list_plot_clear=strrep(file_list_plot, '_',' ');
+
+                    %plot & save to workspace
+
+                    command1=[parameter,'{n_file,1}=file_name;']; 
+                    command2=[parameter,'{n_file,2}=paramValue_primarypipe;']; %/sat_temp_inlet;');%'-sat_temp_inlet;');
+                    eval(command1);
+                    eval(command2);     
+
+                    command3=[parameter_secondary,'{n_file,1}=file_name;']; 
+                    command4=[parameter_secondary,'{n_file,2}=paramValue_secondarypipe;']; %/sat_temp_inlet;');%'-sat_temp_inlet;');
+                    eval(command3);
+                    eval(command4);    
+
+                    if nodalization{5,2}>1
+                        command5=[parameter_horztube,'{n_file,1}=file_name;']; 
+                        command6=[parameter_horztube,'{n_file,2}=paramValue_horztube_interleaved;']; %/sat_temp_inlet;');%'-sat_temp_inlet;');
+                        eval(command5);
+                        eval(command6); 
                     end
                 else
-                    paramValue_primarypipe=cell2mat(paramValue_all(1: tube_vol,starting_column:end));
-                    paramValue_secondarypipe=cell2mat(paramValue_all(ss_start_vol:ss_end_vol,starting_column:end));                
-                    if nodalization{5,2}>1
-                        command_inter='paramValue_horztube_interleaved=reshape([';
-                        for horztube_counter=1:numel(horz_tub_pos)
-                            paramValue_horztube{horztube_counter}=cell2mat(paramValue_all(horz_tub_pos(horztube_counter):(horz_tub_pos(horztube_counter)+nodalization{3,2}-1),starting_column:end));
-                            command_inter=[command_inter,'paramValue_horztube{',num2str(horztube_counter),'};'];
-                        end
-
-                        command_inter=[command_inter,'],',num2str(nodalization{3,2}),',[]);'];   % 30 - two times the number of vertical volumes
-                        eval(command_inter);
-                    end
-                end
-
-                %from to are set to last, to plot only last plot
-                from=numel(paramValue_primarypipe(1,:));
-                to=numel(paramValue_primarypipe(1,:));
-
-                %prepare list of files for plotting legend
-
-                file_list_plot{n_file}=file_name;
-                file_list_plot_clear=strrep(file_list_plot, '_',' ');
-
-                %plot & save to workspace
-
-                command1=[parameter,'{n_file,1}=file_name;']; 
-                command2=[parameter,'{n_file,2}=paramValue_primarypipe;']; %/sat_temp_inlet;');%'-sat_temp_inlet;');
-                eval(command1);
-                eval(command2);     
-
-                command3=[parameter_secondary,'{n_file,1}=file_name;']; 
-                command4=[parameter_secondary,'{n_file,2}=paramValue_secondarypipe;']; %/sat_temp_inlet;');%'-sat_temp_inlet;');
-                eval(command3);
-                eval(command4);    
-
-                if nodalization{5,2}>1
-                    command5=[parameter_horztube,'{n_file,1}=file_name;']; 
-                    command6=[parameter_horztube,'{n_file,2}=paramValue_horztube_interleaved;']; %/sat_temp_inlet;');%'-sat_temp_inlet;');
-                    eval(command5);
-                    eval(command6); 
+                    %if no values were found for the parameter, delete it
+                    %from the processing list
+                    parameters2process(o)=[];
+                    parametersAmount=parametersAmount-1;
                 end
             end
 
             %% Define x-axis for plots - time 
 
             %if clause below gets x data from time stored in output file
-            time_row_no=1303;
+            time_row_no=1302;
             if strcmp(data(time_row_no,1),'time')
                 Time=data(time_row_no,starting_column:end);
             else
                 time_pos = find(cellfun(@(x) any(strcmp(x,'time')),data));
                 Time=data(time_pos,starting_column:end);
-                disp('position of time cell has changed - for performance adjust line 217 in plotter.mat');
-                disp(['for time_row_no use the following position: ',time_pos]);              
+                disp('position of time cell has changed - for performance adjust line 208 in plotter.mat');
+                disp(['for time_row_no use the following position: ',num2str(time_pos)]);              
             end
 
             for celmat_time=1:numel(Time)
@@ -214,14 +222,14 @@ function plotter_mat(default_dir,sequence,firstInSeq)
             Time_mat_cell{n_file}=Time_mat;
 
         %% Check and plot mass balance
-            tmass_row_no=1304;
+            tmass_row_no=1303;
             if strcmp(data(tmass_row_no,1),'tmass')
                 tmass=data(tmass_row_no,starting_column:end);
             else
                 tmass_pos = find(cellfun(@(x) any(strcmp(x,'tmass')),data));
                 tmass=data(tmass_pos,starting_column:end);
                 disp('position of tmass cell has changed - for performance adjust line 217 in plotter.mat');
-                disp(['for tmass_row_no use the following position: ',tmass_pos]);       
+                disp(['for tmass_row_no use the following position: ',num2str(tmass_pos)]);       
             end
 
 
